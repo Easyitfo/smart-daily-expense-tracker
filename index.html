@@ -3,66 +3,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Smart Expense Tracker</title>
 <style>
 *{box-sizing:border-box}
-body{
-  margin:0;
-  padding:20px;
-  font-family:Arial,sans-serif;
-  background:#f1f5f9;
-  color:#172033;
-}
-.container{
-  max-width:500px;
-  margin:auto;
-}
+body{margin:0;padding:18px;font-family:Arial;background:#f1f5f9;color:#172033}
+.container{max-width:520px;margin:auto}
 h1{text-align:center;color:#167c60}
-.card{
-  background:white;
-  padding:18px;
-  border-radius:14px;
-  margin:15px 0;
-  box-shadow:0 2px 10px #0001;
-}
-.stats{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-.stat{
-  background:#e8f5ef;
-  padding:14px;
-  border-radius:10px;
-}
-input,select,button{
-  width:100%;
-  padding:13px;
-  margin:7px 0;
-  border:1px solid #ddd;
-  border-radius:8px;
-  font-size:16px;
-}
-button{
-  background:#16835f;
-  color:white;
-  border:0;
-  font-weight:bold;
-}
-.item{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  padding:12px 0;
-  border-bottom:1px solid #eee;
-}
-.delete{
-  width:auto;
-  padding:7px 10px;
-  background:#dc4444;
-}
+.card{background:white;padding:18px;border-radius:14px;margin:15px 0;box-shadow:0 2px 10px #0001}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#e8f5ef;padding:13px;border-radius:10px;overflow-wrap:anywhere}
+input,select,button{width:100%;padding:13px;margin:7px 0;border:1px solid #ddd;border-radius:8px;font-size:16px}
+button{background:#16835f;color:white;border:0;font-weight:bold}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid #eee}
+.delete{width:auto;padding:8px;background:#dc4444}
 small{color:#64748b}
+.report{background:#eef4ff;padding:13px;border-radius:10px;margin-top:10px}
 </style>
 </head>
 <body>
@@ -89,12 +45,30 @@ small{color:#64748b}
 <div class="card">
  <h3>Add New Transaction</h3>
  <input id="description" placeholder="Enter description">
- <input id="amount" type="number" min="1" placeholder="Enter amount">
+ <input id="amount" type="number" min="0.01" step="0.01" placeholder="Enter amount">
  <select id="type">
   <option value="income">Income</option>
   <option value="expense">Expense</option>
  </select>
  <button onclick="addTransaction()">Add Transaction</button>
+</div>
+
+<div class="card">
+ <h3>📊 Monthly Report</h3>
+ <label>Select Month</label>
+ <input type="month" id="month">
+ <div class="report">
+  <p>Monthly Income: <b id="monthlyIncome">TZS 0</b></p>
+  <p>Monthly Expense: <b id="monthlyExpense">TZS 0</b></p>
+  <hr>
+  <p>Monthly Balance: <b id="monthlyBalance">TZS 0</b></p>
+ </div>
+</div>
+
+<div class="card">
+ <h3>📥 Download Your Report</h3>
+ <p>Download all your transactions as a CSV file.</p>
+ <button onclick="downloadCSV()">Download CSV Report</button>
 </div>
 
 <div class="card">
@@ -108,17 +82,33 @@ let transactions = JSON.parse(
  localStorage.getItem("transactions") || "[]"
 );
 
+// Add dates to transactions created by the previous version.
+transactions.forEach(t=>{
+ if(!t.date){
+  t.date=new Date().toISOString().slice(0,10);
+ }
+});
+
+const today=new Date();
+const monthInput=document.getElementById("month");
+monthInput.value=today.getFullYear()+"-"+
+ String(today.getMonth()+1).padStart(2,"0");
+
 function money(value){
- return "TZS " + value.toLocaleString("en-US");
+ return "TZS "+value.toLocaleString("en-US");
+}
+
+function save(){
+ localStorage.setItem(
+  "transactions",JSON.stringify(transactions)
+ );
+ render();
 }
 
 function addTransaction(){
- const description =
- document.getElementById("description").value.trim();
- const amount =
- Number(document.getElementById("amount").value);
- const type =
- document.getElementById("type").value;
+ const description=document.getElementById("description").value.trim();
+ const amount=Number(document.getElementById("amount").value);
+ const type=document.getElementById("type").value;
 
  if(!description || !Number.isFinite(amount) || amount<=0){
   alert("Please enter a description and valid amount.");
@@ -129,7 +119,8 @@ function addTransaction(){
   id:Date.now(),
   description,
   amount,
-  type
+  type,
+  date:new Date().toISOString().slice(0,10)
  });
 
  save();
@@ -142,29 +133,22 @@ function removeTransaction(id){
  save();
 }
 
-function save(){
- localStorage.setItem(
-  "transactions",JSON.stringify(transactions)
- );
- render();
-}
-
 function render(){
  let income=0,expense=0;
  const history=document.getElementById("history");
-
  history.innerHTML="";
 
  transactions.forEach(t=>{
-  if(t.type==="income") income+=t.amount;
-  else expense+=t.amount;
+  if(t.type==="income") income+=Number(t.amount);
+  else expense+=Number(t.amount);
 
   const item=document.createElement("div");
   item.className="item";
 
   const details=document.createElement("span");
-  details.textContent=t.description+" — "+
-   (t.type==="income"?"+":"-")+money(t.amount);
+  details.textContent=t.description+" | "+
+   (t.type==="income"?"+":"-")+money(Number(t.amount))+
+   " | "+t.date;
 
   const del=document.createElement("button");
   del.className="delete";
@@ -181,11 +165,64 @@ function render(){
 
  document.getElementById("income").textContent=money(income);
  document.getElementById("expense").textContent=money(expense);
- document.getElementById("balance").textContent=
-  money(income-expense);
+ document.getElementById("balance").textContent=money(income-expense);
+
+ updateMonthlyReport();
 }
 
-render();
+function updateMonthlyReport(){
+ const selectedMonth=monthInput.value;
+ let income=0,expense=0;
+
+ transactions.forEach(t=>{
+  if(t.date && t.date.slice(0,7)===selectedMonth){
+   if(t.type==="income") income+=Number(t.amount);
+   else expense+=Number(t.amount);
+  }
+ });
+
+ document.getElementById("monthlyIncome").textContent=money(income);
+ document.getElementById("monthlyExpense").textContent=money(expense);
+ document.getElementById("monthlyBalance").textContent=money(income-expense);
+}
+
+monthInput.addEventListener("change",updateMonthlyReport);
+
+function downloadCSV(){
+ if(transactions.length===0){
+  alert("No transactions available to download.");
+  return;
+ }
+
+ const rows=[
+  ["Date","Description","Type","Amount (TZS)"],
+  ...transactions.map(t=>[
+   t.date,
+   t.description,
+   t.type,
+   t.amount
+  ])
+ ];
+
+ const csv=rows.map(row=>
+  row.map(value=>
+   '"'+String(value).replace(/"/g,'""')+'"'
+  ).join(",")
+ ).join("\r\n");
+
+ const blob=new Blob(["\uFEFF"+csv],{
+  type:"text/csv;charset=utf-8;"
+ });
+
+ const url=URL.createObjectURL(blob);
+ const link=document.createElement("a");
+ link.href=url;
+ link.download="expense-report.csv";
+ link.click();
+ URL.revokeObjectURL(url);
+}
+
+save();
 </script>
 </body>
 </html>
